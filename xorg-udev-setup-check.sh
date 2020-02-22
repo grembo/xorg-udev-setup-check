@@ -38,7 +38,7 @@ info()
 
 usage()
 {
-	echo "Usage: $ME [-hdq]"
+	echo "Usage: $ME [-hdpi]"
 	echo "   -h print this help"
 	echo "   -d skip drm checks"
 	echo "   -p skip package version checks"

@@ -19,7 +19,7 @@ It might work on 11.3-RELEASE, but this hasn't been tested.
 
 Usage:
 
-    ./xorg-udev-setup-check.sh [-hdq]
+    ./xorg-udev-setup-check.sh [-hdpi]
        -h print this help
        -d skip drm checks
        -p skip package version checks
