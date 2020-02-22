@@ -215,11 +215,22 @@ sysrc hald_enable=NO
 		;;
 esac
 
+# Check if moused is running
+pgrep moused >/dev/null && die "moused is running
+
+Please stop moused.
+
+You can disable moused permanently by running:
+
+sysrc moused_nondefault_enable=NO
+sysrc moused_enable=NO
+"
 
 # done here if drm checks are skipped
 if [ $SKIP_DRM -eq 1 ]; then
   finished
 fi
+
 
 ######################################################
 ### DRM CHECKS (not comprehensive)
