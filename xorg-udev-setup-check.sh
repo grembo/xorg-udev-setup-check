@@ -194,7 +194,7 @@ xf86-input-synaptics is installed.
 
 This can interfere with xf86-input-libinput, please remove using
 
-pkg delete xf86-input-libinput
+pkg delete xf86-input-synaptics
 "
 
 # Check if hald is enabled
