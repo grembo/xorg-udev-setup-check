@@ -109,7 +109,7 @@ finished()
 		echo "${bold}${green}Done:${normal} ${bold}All checks passed${normal}"
 		exit 0
 	fi
-	echo "${red}${bold}Found ${ERRORS} errors${normal}"
+	echo "${red}${bold}Found ${ERRORS} error(s) in setup${normal}"
 	exit 1
 }
 
@@ -177,7 +177,7 @@ if [ $NO_COLORS -eq 0 ]; then
 fi
 
 TEST "Check if kernel supports evdev"
-sysctl -qn kern.evdev.rcpt_mask >/dev/null || die "
+sysctl -qn kern.evdev.rcpt_mask >/dev/null || die "\
 Your kernel doesn't support evdev.
 
 Recompile kernel with evdev support:
@@ -196,7 +196,7 @@ You might consider setting it to 6 in case of problems
 You might consider setting it to 12 in case of problems
 (which will change keyboard events to go to hardware)"
 		;;
-	*) die "
+	*) die "\
 kern.evdev.rcpt_mask is misconfigured.
 
 It is a bitmask that defines what is receiving events:
