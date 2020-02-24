@@ -17,20 +17,48 @@ REQUIRED_PACKAGES="\
 	libevdev:1.5.9_1
 	libinput:1.15.2\
 "
+EXPECTED_CONFIG_FILES="\
+	/usr/local/share/X11/xorg.conf.d/10-evdev.conf
+	/usr/local/share/X11/xorg.conf.d/10-quirks.conf
+	/usr/local/share/X11/xorg.conf.d/20-evdev-kbd.conf
+	/usr/local/share/X11/xorg.conf.d/40-libinput.conf
+"
 
 SHOW_INFO=1
 SEEN_INFO=0
 SKIP_DRM=0
 SKIP_VERSION_CHECKS=0
+SKIP_FILE_CHECKS=0
 NO_COLORS=0
 VERBOSE=0
+GATHER_EVIDENCE=0
+EVIDENCE=""
+KEEP_GOING=0
 TPUT=/usr/bin/tput
+ERRORS=0
+
+add_evidence()
+{
+	if [ $GATHER_EVIDENCE -eq 1 ]; then
+		EVIDENCE="$EVIDENCE"$'\n'"$@"
+	fi
+}
+
+output_evidence()
+{
+	if [ $GATHER_EVIDENCE -eq 1 ]; then
+		echo
+		echo "${bold}EVIDENCE (experimental):${normal}"
+		echo "${magenta}$EVIDENCE${normal}"
+	fi
+}
 
 TEST()
 {
 	if [ $VERBOSE -eq 1 ]; then
 		echo "${blue}${bold}$@${normal}"
 	fi
+	add_evidence "$@"
 }
 
 info()
@@ -43,12 +71,13 @@ info()
 		echo
 		SEEN_INFO=1
 	fi
+	add_evidence "Info: $@"
 }
 
 seen_info_note()
 {
 	if [ $SEEN_INFO -eq 1 ]; then
-		printf -- "${cyan}-- To suppress ${cyan}info messages, "
+		printf -- "${cyan}>> To suppress ${cyan}info messages, "
 		echo "run ${ME} -i ${ARGS}${normal}"
 		echo
 	fi
@@ -59,33 +88,46 @@ die()
 	seen_info_note
 	title=$(echo "$@" | head -n 1)
 	body=$(echo "$@" | tail -n +2)
-	echo "${red}${bold}Error:${normal} ${bold}${title}${normal}" 1>&2
+	echo "${red}${bold}Error: ${normal} ${bold}${title}${normal}" 1>&2
 	echo "${body}" 1>&2
 	echo
 	echo "${bold}Please fix and re-run ${ME} ${ARGS}${normal}"
-	exit 1;
+	add_evidence "Error: $@"
+	if [ $KEEP_GOING -eq 0 ]; then
+		output_evidence
+		exit 1;
+	fi
+	ERRORS=$((ERRORS+1))
 }
 
 finished()
 {
 	seen_info_note
-	echo "${bold}${green}Done:${normal} ${bold}All checks passed${normal}"
-	exit 0
+	output_evidence
+	if [ $ERRORS -eq 0 ]; then
+		echo "${bold}${green}Done:${normal} ${bold}All checks passed${normal}"
+		exit 0
+	fi
+	echo "${red}${bold}Found ${ERRORS} errors${normal}"
+	exit 1
 }
 
 usage()
 {
-	echo "Usage: ${ME} [-hdpicv]"
+	echo "Usage: ${ME} [-hdpicvefk]"
 	echo "   -h print this help"
 	echo "   -d skip drm checks"
 	echo "   -p skip package version checks"
 	echo "   -i only show errors (suppress info)"
 	echo "   -c no colors"
 	echo "   -v verbose"
+	echo "   -e gather evidence (experimental)"
+	echo "   -f skip file checks"
+	echo "   -k keep going, do not stop on error"
 	exit 0
 }
 
-while getopts "hdpicv" _o; do
+while getopts "hdpicvefk" _o; do
 	case "$_o" in
 	h)
 		usage
@@ -104,6 +146,15 @@ while getopts "hdpicv" _o; do
 		;;
 	v)
 		VERBOSE=1
+		;;
+	e)
+		GATHER_EVIDENCE=1
+		;;
+	f)
+		SKIP_FILE_CHECKS=1
+		;;
+	k)
+		KEEP_GOING=1
 		;;
 	esac
 done
@@ -220,7 +271,7 @@ if [ $SKIP_VERSION_CHECKS -eq 0 ]; then
 					die "$PKGNAME is outdated.
 Please update to version $PKGVERSION or higher of $PKGNAME.
 
-Your can disable this check by running
+You can disable this check by running
 
 ${ME} -p ${ARGS}
 "
@@ -240,19 +291,54 @@ UDEV enabled
 "
 esac
 
-TEST "Check if user has existing xorg.conf files"
-for CONF in /etc/X11/xorg.conf /usr/local/etc/X11/xorg.conf; do
-	if [ -e $CONF ]; then
-		die "Found existing configuration $CONF
+if [ $SKIP_FILE_CHECKS -eq 0 ]; then
+	TEST "Check if user had custom configuration"
+	FILES=$(find /usr/local/etc/X11/xorg.conf.d -name "*.conf" -type f)
+	if [ $(printf -- "$FILES" | wc -l) -gt 0 ]; then
+		info "Found custom configuration files
+The following custom configuration file(s) exist,
+please make sure their content is sane:
+
+${FILES}
+
+You can disable this check by running
+
+${ME} -f ${ARGS}
+"
+	fi
+
+	TEST "Check if user has existing xorg.conf files"
+	for CONF in /etc/X11/xorg.conf /usr/local/etc/X11/xorg.conf; do
+		if [ -e $CONF ]; then
+			die "Found existing configuration $CONF
 Please move it out of the way, as having these
 tends to mess with proper autodetection.
 
 If you still need some bits from it after testing Xorg
 successfully, please add them as individual files
 in /usr/local/etc/X11/xorg.conf.d/
+
+You can disable this check by running
+
+${ME} -f ${ARGS}
 "
-	fi
-done
+		fi
+	done
+
+	TEST "Check for expected X11 configuration files"
+	for CONF in $EXPECTED_CONFIG_FILES; do
+		if [ ! -e $CONF ]; then
+			die "Config $CONF not found.
+A clean installation is expected to have this file
+installed.
+
+You can disable this check by running
+
+${ME} -f ${ARGS}
+"
+		fi
+	done
+fi
 
 TEST "Check if xf86-input-synaptics is installed (it shouldn't be)"
 pkg query %v xf86-input-synaptics >/dev/null && die "\

@@ -19,10 +19,13 @@ It might work on 11.3-RELEASE, but this hasn't been tested.
 
 Usage:
 
-    ./xorg-udev-setup-check.sh [-hdpicv]
+    ./xorg-udev-setup-check.sh [-hdpicvefk]
        -h print this help
        -d skip drm checks
        -p skip package version checks
        -i only show errors (suppress info)
        -c no colors
        -v verbose
+       -e gather evidence (experimental)
+       -f skip file checks
+       -k keep going, do not stop on error
