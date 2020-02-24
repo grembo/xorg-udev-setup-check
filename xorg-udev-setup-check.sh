@@ -116,14 +116,34 @@ echo kern.evdev.rcpt_mask=6 >>/etc/sysctl.conf
 		;;
 esac
 
-# Check if synapctics touchpad is enabled (only relevant on some laptops)
+# Check if synaptics touchpad is enabled (only relevant on some laptops)
 case $(sysctl -qn hw.psm.synaptics_support) in
 	1)	;;
 	*) info "Synaptics support isn't enabled.
+
 This is only relevant if you use a synapctics touchpad.
 You can enable synaptics support using these commands:
 
-echo hw.psm.synaptics_support >>/boot/loader.conf
+echo hw.psm.synaptics_support=1 >>/boot/loader.conf
+reboot
+"
+		;;
+esac
+
+# Check if trackpoint is enabled (only relevant on some laptops)
+case $(sysctl -qn hw.psm.trackpoint_support) in
+	1)	;;
+	*) info "Trackpoint support isn't enabled.
+
+This is only relevant if you use a trackpoint, like the
+ones found in Lenovo laptops. Needs to be enabled
+to support features like middle mouse button support
+(e.g. to paste or to support middle-click+trackpoint
+to scroll).
+
+You can enable trackpoint support using these commands:
+
+echo hw.psm.trackpoint_support=1 >>/boot/loader.conf
 reboot
 "
 		;;
