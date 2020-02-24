@@ -19,8 +19,10 @@ It might work on 11.3-RELEASE, but this hasn't been tested.
 
 Usage:
 
-    ./xorg-udev-setup-check.sh [-hdpi]
+    ./xorg-udev-setup-check.sh [-hdpicv]
        -h print this help
        -d skip drm checks
        -p skip package version checks
        -i only show errors (suppress info)
+       -c no colors
+       -v verbose
