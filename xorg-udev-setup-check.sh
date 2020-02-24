@@ -91,12 +91,13 @@ die()
 	echo "${red}${bold}Error:${normal} ${bold}${title}${normal}" 1>&2
 	echo "${body}" 1>&2
 	echo
-	echo "${bold}Please fix and re-run ${ME} ${ARGS}${normal}"
 	add_evidence "Error: $@"
 	if [ $KEEP_GOING -eq 0 ]; then
+		echo "${bold}Please fix and re-run ${ME} ${ARGS}${normal}"
 		output_evidence
 		exit 1;
 	fi
+	echo "${bold}Keep going - check results might be inaccurate${normal}"
 	ERRORS=$((ERRORS+1))
 }
 
