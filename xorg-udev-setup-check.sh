@@ -88,7 +88,7 @@ die()
 	seen_info_note
 	title=$(echo "$@" | head -n 1)
 	body=$(echo "$@" | tail -n +2)
-	echo "${red}${bold}Error: ${normal} ${bold}${title}${normal}" 1>&2
+	echo "${red}${bold}Error:${normal} ${bold}${title}${normal}" 1>&2
 	echo "${body}" 1>&2
 	echo
 	echo "${bold}Please fix and re-run ${ME} ${ARGS}${normal}"
