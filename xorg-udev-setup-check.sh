@@ -17,6 +17,9 @@ REQUIRED_PACKAGES="\
 	libevdev:1.5.9_1
 	libinput:1.15.2\
 "
+OPTIONAL_PACKAGES="\
+	xf86-video-scfb:0.0.5_2\
+"
 EXPECTED_CONFIG_FILES="\
 	/usr/local/share/X11/xorg.conf.d/10-evdev.conf
 	/usr/local/share/X11/xorg.conf.d/10-quirks.conf
@@ -32,6 +35,7 @@ SKIP_FILE_CHECKS=0
 NO_COLORS=0
 VERBOSE=0
 GATHER_EVIDENCE=0
+USE_SUDO=0
 EVIDENCE=""
 KEEP_GOING=0
 TPUT=/usr/bin/tput
@@ -44,13 +48,96 @@ add_evidence()
 	fi
 }
 
-output_evidence()
+new_evidence()
 {
-	if [ $GATHER_EVIDENCE -eq 1 ]; then
-		echo
-		echo "${bold}EVIDENCE (experimental):${normal}"
-		echo "${magenta}$EVIDENCE${normal}"
+	add_evidence $'\n'"$@:"
+	if [ $VERBOSE -eq 1 ]; then
+		echo "${blue}${bold}Gathering: $@${normal}"
 	fi
+}
+
+fatal()
+{
+	echo "${bold}${red}Fatal: $@${normal}"
+	exit 1
+}
+
+gather_evidence()
+{
+	if [ $GATHER_EVIDENCE -ne 1 ]; then
+		return
+	fi
+
+	new_evidence "uname"
+	add_evidence "$(uname -a 2>&1)"
+	new_evidence "FreeBSD version (installed/running/userland)"
+	add_evidence "$(freebsd-version -kru 2>&1)"
+	new_evidence "Config Files"
+	add_evidence "$(find -s \
+			/etc/X11 /usr/local/etc/X11 \
+	                /usr/local/share/X11/xorg.conf.d \
+	                2>&1)"
+	new_evidence "Config Contents"
+	for CONF in $(find -s \
+	              /boot/loader.conf \
+	              /etc/rc.conf \
+	              /etc/sysctl.conf \
+	              /usr/local/etc/X11/xorg.conf.d \
+		      /usr/local/share/X11/xorg.conf.d \
+		      -name "*.conf"); do
+		new_evidence "$CONF"
+		add_evidence "$(cat $CONF 2>&1)"
+	done
+	for category in x11-drivers x11-servers x11-wm; do
+		new_evidence "Installed ${category} packages"
+		add_evidence \
+		"$(pkg query -g -e "%o ~ '${category}/*'" %n-%v 2>&1)"
+	done
+	new_evidence "PCI config"
+	add_evidence "$(pciconf -lv 2>&1)"
+	new_evidence "xinput devices"
+	add_evidence "$(xinput list 2>&1)"
+	new_evidence "xinput devices (long)"
+	add_evidence "$(xinput list --long 2>&1)"
+	for ID in $(xinput list --id-only 2>/dev/null); do
+		new_evidence "xinput device id $ID properties"
+		add_evidence "$(xinput list-props $ID)"
+	done
+
+	# libinput usually requires root access to read /dev/input/event*
+	sudo=""
+	if [ "$(id -u)" -ne 0 ] && [ $USE_SUDO -eq 1 ] ; then
+		sudo="sudo "
+	fi
+	new_evidence "libinput list-devices"
+	add_evidence "$(${sudo}libinput list-devices 2>&1)"
+
+	LATEST_XLOG="$(ls -t /var/log/Xorg.*.log 2>/dev/null | head -n1)"
+	if [ ! -z "$LATEST_XLOG" ]; then
+		new_evidence "First 1000 lines of ${LATEST_XLOG}"
+		add_evidence "$(head -n 1000 $LATEST_XLOG)"
+	fi
+
+	# done collecting, write to file
+	TEMPFILE=$(mktemp -t xorg-evidence) || fatal "Couldn't write evidence file"
+	echo "xorg evidence collected on $(hostname)" >$TEMPFILE
+	echo "Date: $(date)" >>$TEMPFILE
+	echo "Command: ${ME} ${ARGS}" >>$TEMPFILE
+	echo >>$TEMPFILE
+	echo "$EVIDENCE" >>$TEMPFILE
+
+	echo "
+${magenta}${bold}Gathered evidence was written to $TEMPFILE${normal}
+
+${magenta}This file can be used to get help & when filing a bug reports at
+https://bugs.freebsd.org/bugzilla/enter_bug.cgi
+
+Please make sure that you're comfortable with the content of that
+file ${bold}before${normal}${magenta} sharing/uploading it:
+
+${bold}${PAGER} $TEMPFILE${normal}
+"
+
 }
 
 TEST()
@@ -85,7 +172,9 @@ seen_info_note()
 
 die()
 {
-	seen_info_note
+	if [ $KEEP_GOING -eq 0 ]; then
+		seen_info_note
+	fi
 	title=$(echo "$@" | head -n 1)
 	body=$(echo "$@" | tail -n +2)
 	echo "${red}${bold}Error:${normal} ${bold}${title}${normal}" 1>&2
@@ -94,41 +183,44 @@ die()
 	add_evidence "Error: $@"
 	if [ $KEEP_GOING -eq 0 ]; then
 		echo "${bold}Please fix and re-run ${ME} ${ARGS}${normal}"
-		output_evidence
+		gather_evidence
 		exit 1;
 	fi
 	echo "${bold}Keep going - check results might be inaccurate${normal}"
+	echo
 	ERRORS=$((ERRORS+1))
 }
 
 finished()
 {
 	seen_info_note
-	output_evidence
 	if [ $ERRORS -eq 0 ]; then
-		echo "${bold}${green}Done:${normal} ${bold}All checks passed${normal}"
-		exit 0
+		printf "${bold}${green}Done:${normal} "
+		echo "${bold}All checks passed${normal}"
+	else
+		echo "${red}${bold}Found ${ERRORS} error(s) in setup${normal}"
 	fi
-	echo "${red}${bold}Found ${ERRORS} error(s) in setup${normal}"
-	exit 1
+	gather_evidence
+	exit $ERRORS
 }
 
 usage()
 {
-	echo "Usage: ${ME} [-hdpicvefk]"
+	echo "Usage: ${ME} [-hdpicvesfk]"
 	echo "   -h print this help"
 	echo "   -d skip drm checks"
 	echo "   -p skip package version checks"
 	echo "   -i only show errors (suppress info)"
 	echo "   -c no colors"
 	echo "   -v verbose"
-	echo "   -e gather evidence (experimental)"
+	echo "   -e gather evidence"
+	echo "   -s use sudo for some evidence as non-root user"
 	echo "   -f skip file checks"
 	echo "   -k keep going, do not stop on error"
 	exit 0
 }
 
-while getopts "hdpicvefk" _o; do
+while getopts "hdpicvesfk" _o; do
 	case "$_o" in
 	h)
 		usage
@@ -150,6 +242,9 @@ while getopts "hdpicvefk" _o; do
 		;;
 	e)
 		GATHER_EVIDENCE=1
+		;;
+	s)
+		USE_SUDO=1
 		;;
 	f)
 		SKIP_FILE_CHECKS=1
@@ -261,11 +356,32 @@ pkg install $PKGNAME
 ";
 done
 
-TEST "Check if required package versions are installed"
 if [ $SKIP_VERSION_CHECKS -eq 0 ]; then
+	TEST "Check if required package versions are installed"
 	for PKGNAME_V in $REQUIRED_PACKAGES; do
 		PKGNAME=$(echo $PKGNAME_V | awk -F\: '{ print $1 }')
 		PKGVERSION=$(echo $PKGNAME_V | awk -F\: '{ print $2 }')
+		case `(printf $(pkg query %v $PKGNAME)".0\n"; \
+			echo $PKGVERSION) | sort -V | tail -n1` in
+			$PKGVERSION)
+					die "$PKGNAME is outdated.
+Please update to version $PKGVERSION or higher of $PKGNAME.
+
+You can disable this check by running
+
+${ME} -p ${ARGS}
+"
+					;;
+			*)
+					;;
+		esac
+	done
+
+	TEST "Check if optional packages have required versions"
+	for PKGNAME_V in $OPTIONAL_PACKAGES; do
+		PKGNAME=$(echo $PKGNAME_V | awk -F\: '{ print $1 }')
+		PKGVERSION=$(echo $PKGNAME_V | awk -F\: '{ print $2 }')
+		pkg query %v $PKGNAME >/dev/null &&
 		case `(printf $(pkg query %v $PKGNAME)".0\n"; \
 			echo $PKGVERSION) | sort -V | tail -n1` in
 			$PKGVERSION)
@@ -294,11 +410,11 @@ esac
 
 if [ $SKIP_FILE_CHECKS -eq 0 ]; then
 	TEST "Check if user had custom configuration"
-	FILES=$(find /usr/local/etc/X11/xorg.conf.d -name "*.conf" -type f)
-	if [ $(printf -- "$FILES" | wc -l) -gt 0 ]; then
+	FILES=$(find -s /usr/local/etc/X11/xorg.conf.d -name "*.conf" -type f)
+	if [ ! -z "$FILES" ]; then
 		info "Found custom configuration files
 The following custom configuration file(s) exist,
-please make sure their content is sane:
+please make sure their contents are sane:
 
 ${FILES}
 
@@ -420,13 +536,13 @@ packages named drm-fbsd*-kmod first)
 "
 fi
 
-TEST "Check if i915kms or radeonkms are configured in loader.conf (they shouldn't)"
+TEST "Check if i915kms is configured in loader.conf (it shouldn't be)"
 sysrc -f /boot/loader.conf i915kms_load >/dev/null 2>&1 && die "\
 i915kms_load is configured in /boot/loader.conf
 Please remove it from there and use kld_list in /etc/rc.conf instead.
 "
 
-TEST "Check if radeonkms or radeonkms are configured in loader.conf (they shouldn't)"
+TEST "Check if radeonkms is configured in loader.conf (it shouldn't be)"
 sysrc -f /boot/loader.conf radeonkms_load >/dev/null 2>&1 && die "\
 radeonkms_load is configured in /boot/loader.conf
 Please remove it from there and use kld_list in /etc/rc.conf instead.
@@ -457,9 +573,11 @@ fi
 
 # testing for intel here, modesetting has sometimes issues
 TEST "Check if graphics driver is installed (only intel)"
-pkg query %v xf86-video-intel >/dev/null || info "xf86-video-intel isn't installed
-Consider installing it in case you encounter problems with
-the modesetting driver (tearing)
+pkg query %v xf86-video-intel >/dev/null || info "\
+xf86-video-intel isn't installed
+Consider installing it in case you have an intel graphics
+adapter and encounter problems with the modesetting driver
+(e.g. tearing)
 "
 
 ### DRM END
