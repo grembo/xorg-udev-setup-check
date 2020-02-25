@@ -30,8 +30,8 @@ Usage:
 
 ## How to check your setup
 
-Simply invoke the script without any parameters. By default, this will you
-hints ("Info:") and stop at the first hard error.
+Simply invoke the script without any parameters. By default, this will give
+you hints ("Info:") and stop at the first hard error.
 
 Some checks can be skipped (see above). The script will also tell you which
 option to use to skip a check that failed.
