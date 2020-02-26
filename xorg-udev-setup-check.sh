@@ -548,19 +548,19 @@ radeonkms_load is configured in /boot/loader.conf
 Please remove it from there and use kld_list in /etc/rc.conf instead.
 "
 
-TEST "Check drm modules are loaded"
+TEST "Check if drm modules are loaded"
 kldstat -m i915kms >/dev/null 2>&1
-i915_loaded=$?
+i915kms_loaded=$?
 kldstat -m radeonkms >/dev/null 2>&1
-radeon_loaded=$?
+radeonkms_loaded=$?
 
-if [ $i915_loaded -ne 0 ] && [ $radeon_loaded -ne 0 ]; then
+if [ $i915kms_loaded -ne 0 ] && [ $radeonkms_loaded -ne 0 ]; then
 	die "Neither i915kms nor radeonkms is loaded.
 Please load using
 
-kldload /boot/modules/i915kms
+kldload /boot/modules/i915kms.ko
 or
-kldload /boot/modules/radeonkms
+kldload /boot/modules/radeonkms.ko
 
 You can load one of these drivers automatically on
 boot by adding it to kld_list in rc.conf:
@@ -570,6 +570,21 @@ or
 sysrc kld_list+=/boot/modules/radeonkms.ko
 "
 fi
+
+for MOD in i915kms radeonkms; do
+	eval LOADED=\$${MOD}_loaded
+	if [ $LOADED -eq 0 ]; then
+		TEST "Check ${MOD} is configured to load in /etc/rc.conf"
+sysrc kld_list 2>/dev/null | egrep -q "/boot/modules/${MOD}\.ko" || \
+   info "i915kms currently loaded, but not configured to load on boot.
+Once you verified that it can be loaded successfully,
+enable automatic loading on boot by adding it to
+kld_list in rc.conf:
+
+sysrc kld_list+=/boot/modules/i915kms.ko
+"
+	fi
+done
 
 # testing for intel here, modesetting has sometimes issues
 TEST "Check if graphics driver is installed (only intel)"
