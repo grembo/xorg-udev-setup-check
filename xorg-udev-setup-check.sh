@@ -571,17 +571,6 @@ sysrc kld_list+=/boot/modules/radeonkms.ko
 "
 fi
 
-TEST "Check drm modules are configured to load in /etc/rc.conf"
-sysrc kld_list 2>/dev/null | egrep -q "/boot/modules/(i915|radeon)kms\.ko" || \
-  info "Neither i915kms nor radeonkms is configured to load on boot.
-You load one of these drivers automatically on
-boot by adding it to kld_list in rc.conf:
-
-sysrc kld_list+=/boot/modules/i915kms.ko
-or
-sysrc kld_list+=/boot/modules/radeonkms.ko
-"
-
 # testing for intel here, modesetting has sometimes issues
 TEST "Check if graphics driver is installed (only intel)"
 pkg query %v xf86-video-intel >/dev/null || info "\
