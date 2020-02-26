@@ -558,9 +558,9 @@ if [ $i915_loaded -ne 0 ] && [ $radeon_loaded -ne 0 ]; then
 	die "Neither i915kms nor radeonkms is loaded.
 Please load using
 
-kldload i915kms
+kldload /boot/modules/i915kms
 or
-kldload radeonkms
+kldload /boot/modules/radeonkms
 
 You can load one of these drivers automatically on
 boot by adding it to kld_list in rc.conf:
@@ -570,6 +570,17 @@ or
 sysrc kld_list+=/boot/modules/radeonkms.ko
 "
 fi
+
+TEST "Check drm modules are configured to load in /etc/rc.conf"
+sysrc kld_list 2>/dev/null | egrep -q "/boot/modules/(i915|radeon)kms\.ko" || \
+  info "Neither i915kms nor radeonkms is configured to load on boot.
+You load one of these drivers automatically on
+boot by adding it to kld_list in rc.conf:
+
+sysrc kld_list+=/boot/modules/i915kms.ko
+or
+sysrc kld_list+=/boot/modules/radeonkms.ko
+"
 
 # testing for intel here, modesetting has sometimes issues
 TEST "Check if graphics driver is installed (only intel)"
