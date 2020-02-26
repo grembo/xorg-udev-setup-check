@@ -548,7 +548,7 @@ radeonkms_load is configured in /boot/loader.conf
 Please remove it from there and use kld_list in /etc/rc.conf instead.
 "
 
-TEST "Check drm modules are loaded"
+TEST "Check if drm modules are loaded"
 kldstat -m i915kms >/dev/null 2>&1
 i915_loaded=$?
 kldstat -m radeonkms >/dev/null 2>&1
@@ -558,9 +558,9 @@ if [ $i915_loaded -ne 0 ] && [ $radeon_loaded -ne 0 ]; then
 	die "Neither i915kms nor radeonkms is loaded.
 Please load using
 
-kldload /boot/modules/i915kms
+kldload /boot/modules/i915kms.ko
 or
-kldload /boot/modules/radeonkms
+kldload /boot/modules/radeonkms.ko
 
 You can load one of these drivers automatically on
 boot by adding it to kld_list in rc.conf:
