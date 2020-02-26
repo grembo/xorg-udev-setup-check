@@ -576,12 +576,12 @@ for MOD in i915kms radeonkms; do
 	if [ $LOADED -eq 0 ]; then
 		TEST "Check ${MOD} is configured to load in /etc/rc.conf"
 sysrc kld_list 2>/dev/null | egrep -q "/boot/modules/${MOD}\.ko" || \
-   info "i915kms currently loaded, but not configured to load on boot.
+   info "${MOD} currently loaded, but not configured to load on boot.
 Once you verified that it can be loaded successfully,
 enable automatic loading on boot by adding it to
 kld_list in rc.conf:
 
-sysrc kld_list+=/boot/modules/i915kms.ko
+sysrc kld_list+=/boot/modules/${MOD}.ko
 "
 	fi
 done
