@@ -82,6 +82,7 @@ gather_evidence()
 	              /boot/loader.conf \
 	              /etc/rc.conf \
 	              /etc/sysctl.conf \
+	              /etc/X11 \
 	              /usr/local/etc/X11/xorg.conf.d \
 		      /usr/local/share/X11/xorg.conf.d \
 		      -name "*.conf"); do
