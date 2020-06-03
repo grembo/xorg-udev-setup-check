@@ -40,6 +40,7 @@ EVIDENCE=""
 KEEP_GOING=0
 TPUT=/usr/bin/tput
 ERRORS=0
+USE_SYSMOUSE=0
 
 add_evidence()
 {
@@ -292,6 +293,13 @@ You might consider setting it to 6 in case of problems
 You might consider setting it to 12 in case of problems
 (which will change keyboard events to go to hardware)"
 		;;
+	3) info "kern.evdev.rcpt_mask is set to 3.
+Note that you're using sysmouse this way, which means that
+in case of touchpads and trackpoint you won't get all the
+features you would expect.
+You might want to consider setting kern.evdev.rcpt_mask to 6 or 12."
+		USE_SYSMOUSE=1
+		;;
 	*) die "\
 kern.evdev.rcpt_mask is misconfigured.
 
@@ -307,11 +315,18 @@ sysctl kern.evdev.rcpt_mask=12
 or
 sysctl kern.evdev.rcpt_mask=6
 
+And case you're using sysmouse (e.g., a serial mouse)
+with moused, please set it to 3 using:
+
+sysctl kern.evdev.rcpt_mask=3
+
 You can set it automatically on reboot by issuing the
 following commands:
 echo kern.evdev.rcpt_mask=12 >>/etc/sysctl.conf
 or
 echo kern.evdev.rcpt_mask=6 >>/etc/sysctl.conf
+or
+echo kern.evdev.rcpt_mask=3 >>/etc/sysctl.conf
 "
 		;;
 esac
@@ -484,14 +499,25 @@ sysrc hald_enable=NO
 esac
 
 TEST "Check if moused is running"
-pgrep moused >/dev/null && die "moused is running
-Please stop moused.
+if [ $USE_SYSMOUSE -eq 1 ]; then
+	pgrep moused >/dev/null || die "moused isn't running,
+even though your system is configured to make use of sysmouse.
+Please start moused:
+
+sysrc moused_enable=YES
+service moused start
+"
+else
+	pgrep moused >/dev/null && info "moused is running
+This might cause issues, please consider stopping
+moused.
 
 You can disable moused permanently by running:
 
 sysrc moused_nondefault_enable=NO
 sysrc moused_enable=NO
 "
+fi
 
 # done here if drm checks are skipped
 if [ $SKIP_DRM -eq 1 ]; then
